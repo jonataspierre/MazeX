@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.16788355, g: 0.21073574, b: 0.2899406, a: 1}
+  m_IndirectSpecularColor: {r: 0.18028468, g: 0.22571579, b: 0.30692378, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -97,7 +97,7 @@ LightmapSettings:
     m_ExportTrainingData: 0
     m_TrainingDataDestination: TrainingData
     m_LightProbeSampleCountMultiplier: 4
-  m_LightingDataAsset: {fileID: 112000000, guid: c6f0017d9c3eefc40927adcda33955b7,
+  m_LightingDataAsset: {fileID: 112000004, guid: d20c007eee05e734391687c22003fd8d,
     type: 2}
   m_LightingSettings: {fileID: 4890085278179872738, guid: a37e164e6490648ec966f654d144932b,
     type: 2}
@@ -194,15 +194,15 @@ MonoBehaviour:
   roomMaxSize: {x: 6, y: 6}
   cubePrefab: {fileID: 7415050535990569633, guid: 0845b845785260b41b421d28b957d58a,
     type: 3}
-  redMaterial: {fileID: 2100000, guid: 403892b93a7279d47afacb27492a018b, type: 2}
-  blueMaterial: {fileID: 2100000, guid: 1bc9c5ce01203a64f80002430e002ce7, type: 2}
-  greenMaterial: {fileID: 2100000, guid: 13cd47135277903479d4b55421faa42e, type: 2}
+  redMaterial: {fileID: 2100000, guid: df98d52f9c03f224b9685a5d80db6fd3, type: 2}
+  blueMaterial: {fileID: 2100000, guid: df98d52f9c03f224b9685a5d80db6fd3, type: 2}
+  greenMaterial: {fileID: 2100000, guid: 217343ba0341a124683a18c95fbacd31, type: 2}
   indexExitRoom: 0
   wallPrefab: {fileID: 7415050535990569633, guid: 356d5faebad4c4848a7d74b31953cc29,
     type: 3}
   ceilingPrefab: {fileID: 7415050535990569633, guid: f75611efd5dcf6d44838058ff14626bc,
     type: 3}
-  hasCeiling: 1
+  hasCeiling: 0
   floorContainerParent: {fileID: 74251923}
   wallContainerParent: {fileID: 1584799734}
   ceilingContainerParent: {fileID: 1167208188}
@@ -587,7 +587,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!81 &1061073681
 AudioListener:
   m_ObjectHideFlags: 0
@@ -595,7 +595,7 @@ AudioListener:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1061073680}
-  m_Enabled: 0
+  m_Enabled: 1
 --- !u!20 &1061073682
 Camera:
   m_ObjectHideFlags: 0
@@ -627,8 +627,8 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.3
-  far clip plane: 1000
+  near clip plane: 0.01
+  far clip plane: 300
   field of view: 60
   orthographic: 0
   orthographic size: 5
@@ -641,10 +641,10 @@ Camera:
   m_TargetDisplay: 0
   m_TargetEye: 3
   m_HDR: 1
-  m_AllowMSAA: 1
+  m_AllowMSAA: 0
   m_AllowDynamicResolution: 0
   m_ForceIntoRT: 0
-  m_OcclusionCulling: 1
+  m_OcclusionCulling: 0
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
 --- !u!4 &1061073683
@@ -655,13 +655,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1061073680}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 15, y: 30, z: 15}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1061073684
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -685,8 +685,8 @@ MonoBehaviour:
     m_Bits: 1
   m_VolumeTrigger: {fileID: 0}
   m_VolumeFrameworkUpdateModeOption: 2
-  m_RenderPostProcessing: 0
-  m_Antialiasing: 0
+  m_RenderPostProcessing: 1
+  m_Antialiasing: 1
   m_AntialiasingQuality: 2
   m_StopNaN: 0
   m_Dithering: 0
@@ -860,7 +860,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!108 &1572600685
 Light:
   m_ObjectHideFlags: 0
@@ -931,13 +931,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1572600684}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.40821788, y: -0.23456968, z: 0.10938163, w: 0.8754261}
-  m_LocalPosition: {x: 0, y: 3, z: 0}
+  m_LocalRotation: {x: 0.38302222, y: 0.38302222, z: -0.17860618, w: 0.82139385}
+  m_LocalPosition: {x: 0, y: 10, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
+  m_LocalEulerAnglesHint: {x: 50, y: 50, z: 0}
 --- !u!114 &1572600687
 MonoBehaviour:
   m_ObjectHideFlags: 0
