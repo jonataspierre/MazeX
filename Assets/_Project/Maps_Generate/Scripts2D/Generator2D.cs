@@ -3,9 +3,12 @@ using System.Collections.Generic;
 using UnityEngine;
 using Random = System.Random;
 using Graphs;
+using Photon.Pun;
+using UnityEngine.Events;
 
 
-public class Generator2D : MonoBehaviour {
+public class Generator2D : MonoBehaviourPun
+{
     enum CellType {
         None,
         Room,
@@ -59,7 +62,7 @@ public class Generator2D : MonoBehaviour {
 
     [Space(10)]
     [Header("Exit Pos Setup")]
-    //public List<GameObject> roomsObj;
+    [SerializeField] GameObject exitPrefab;
     public int indexExitRoom;
 
     [Space(10)]
@@ -81,19 +84,43 @@ public class Generator2D : MonoBehaviour {
     [SerializeField] GameObject playerPrefab;
     public int indexPlayerSpawnRoom;
 
+    bool canSpawnerPlayer = false;
+
+    public static UnityEvent<Vector3> OnRoomCreate = new UnityEvent<Vector3>();
+
     void Start()
     {
-        if (!fixedSize)
+        if (PhotonNetwork.IsMasterClient)
         {
-            SetSize();
+            if (!fixedSize)
+            {
+                SetSize();
+            }
+
+            if (!fixedRoomCount)
+            {
+                SetRoomCount();
+            }
+
+            Generate();
+
+            canSpawnerPlayer = true;
         }
 
-        if (!fixedRoomCount)
-        {
-            SetRoomCount();
-        }
-        
-        Generate();
+        if(canSpawnerPlayer)
+            SetSpawnPlayer();
+
+        //if (!fixedSize)
+        //{
+        //    SetSize();
+        //}
+
+        //if (!fixedRoomCount)
+        //{
+        //    SetRoomCount();
+        //}
+
+        //Generate();
     }
 
     [ContextMenu("Generate Map")]
@@ -174,6 +201,8 @@ public class Generator2D : MonoBehaviour {
         CreateHallways();
         PathfindHallways();
         AddWallsAndCeilings();
+
+        
     }
 
     void PlaceRooms()
@@ -216,14 +245,14 @@ public class Generator2D : MonoBehaviour {
         }
 
         SetExitPosition();
-        SetSpawnPlayer();
+        //SetSpawnPlayer();
     }
 
     void SetExitPosition()
     {
         indexExitRoom = UnityEngine.Random.Range(0, rooms.Count);
 
-        GameObject go = Instantiate(cubePrefab, new Vector3(rooms[indexExitRoom].bounds.x, 1, rooms[indexExitRoom].bounds.y), Quaternion.identity);
+        GameObject go = PhotonNetwork.Instantiate(exitPrefab.name, new Vector3(rooms[indexExitRoom].bounds.x, 1, rooms[indexExitRoom].bounds.y), Quaternion.identity);
         go.transform.SetParent(triggersContainerParent.transform, false);        
         go.GetComponent<Transform>().localScale = new Vector3(0.5f, 0.5f, 0.5f);
         go.GetComponent<MeshRenderer>().material = greenMaterial;
@@ -232,6 +261,8 @@ public class Generator2D : MonoBehaviour {
 
     void SetSpawnPlayer()
     {
+        //if(roomCount == 0) roomCount = 2;
+        
         indexPlayerSpawnRoom = UnityEngine.Random.Range(0, rooms.Count);
 
         while(indexPlayerSpawnRoom == indexExitRoom)
@@ -239,11 +270,18 @@ public class Generator2D : MonoBehaviour {
             indexPlayerSpawnRoom = UnityEngine.Random.Range(0, rooms.Count);
         }
 
-        GameObject player = Instantiate(playerPrefab, new Vector3(rooms[indexPlayerSpawnRoom].bounds.x + 1, 1.05f, rooms[indexPlayerSpawnRoom].bounds.y + 1), Quaternion.identity);
-        player.transform.SetParent(playersContainerParent.transform, false);
-        player.GetComponent<Transform>().localScale = new Vector3(0.25f, 0.25f, 0.25f);        
-        player.name = "Player";
-        
+        Vector3 pos = new Vector3(rooms[indexPlayerSpawnRoom].bounds.x + 1, 1.5f, rooms[indexPlayerSpawnRoom].bounds.y + 1);
+
+        OnRoomCreate?.Invoke(pos);
+
+        //GameObject player = Instantiate(playerPrefab, new Vector3(rooms[indexPlayerSpawnRoom].bounds.x + 1, 1.05f, rooms[indexPlayerSpawnRoom].bounds.y + 1), Quaternion.identity);
+        //player.transform.SetParent(playersContainerParent.transform, false);
+        //player.GetComponent<Transform>().localScale = new Vector3(0.25f, 0.25f, 0.25f);        
+        //player.name = "Player";
+
+        //GameObject localPlayer = PhotonNetwork.Instantiate("PlayerManager", new Vector3(rooms[indexPlayerSpawnRoom].bounds.x + 1, 1.05f, rooms[indexPlayerSpawnRoom].bounds.y + 1), Quaternion.identity, 0);
+        //localPlayer.name = "Manager_" + PhotonNetwork.LocalPlayer.NickName;
+
         //player.GetComponent<MeshRenderer>().material = greenMaterial;
     }
 
@@ -333,7 +371,7 @@ public class Generator2D : MonoBehaviour {
 
     void PlaceCube(Vector2Int location, Vector2Int size, Material material, bool isRoom = false)
     {
-        GameObject go = Instantiate(cubePrefab, new Vector3(location.x, 0, location.y), Quaternion.identity);
+        GameObject go = PhotonNetwork.Instantiate(cubePrefab.name, new Vector3(location.x, 0, location.y), Quaternion.identity);
         go.transform.SetParent(floorContainerParent.transform, false);
         go.GetComponent<Transform>().localScale = new Vector3(size.x, 1, size.y);
         go.GetComponent<MeshRenderer>().material = material;        
@@ -391,7 +429,7 @@ public class Generator2D : MonoBehaviour {
         if (hasCeiling)
         {
             // Instanciar o teto como um painel que cobre toda a área do mapa
-            GameObject ceilingObject = Instantiate(ceilingPrefab, new Vector3(0f, 2f, 0f), Quaternion.identity);
+            GameObject ceilingObject = PhotonNetwork.Instantiate(ceilingPrefab.name, new Vector3(0f, 2f, 0f), Quaternion.identity);
             ceilingObject.transform.localScale = new Vector3(size.x, 0.1f, size.y);
             ceilingObject.transform.SetParent(ceilingContainerParent.transform, false);
             // Adicionar um componente de colisão ao teto
@@ -406,7 +444,7 @@ public class Generator2D : MonoBehaviour {
                 if (grid[x, y] == CellType.Wall)
                 {
                     // Instanciar a parede sobre a célula
-                    GameObject wallObject = Instantiate(wallPrefab, new Vector3(x, 1f, y), Quaternion.identity);
+                    GameObject wallObject = PhotonNetwork.Instantiate(wallPrefab.name, new Vector3(x, 1f, y), Quaternion.identity);
                     wallObject.transform.SetParent(wallContainerParent.transform, false);
                     // Adicionar um componente de colisão à parede
                     //wallObject.AddComponent<BoxCollider>();

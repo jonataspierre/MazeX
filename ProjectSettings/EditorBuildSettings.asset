@@ -6,9 +6,12 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/_Project/Scenes/System.unity
-    guid: 149fe84a996e3eb49928ba977feb6773
-  - enabled: 1
     path: Assets/_Project/Scenes/Lobby.unity
     guid: 7958b9e24942f7a44a412b455f8342d2
+  - enabled: 1
+    path: Assets/_Project/Scenes/MazeX_new.unity
+    guid: 354b674b79aacd444b726c511c28f420
+  - enabled: 1
+    path: Assets/_Project/Scenes/MazeX.unity
+    guid: bfff057c0c15d504d99eade4c42f10db
   m_configObjects: {}

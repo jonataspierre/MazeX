@@ -1,13 +1,16 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Photon.Pun;
+using Photon.Realtime;
 
-public class SceneController : MonoBehaviour
+public class SceneController : MonoBehaviourPunCallbacks
 {
     public static SceneController instance;
-    
-    public string sceneName; // Nome da cena a ser carregada
+
+    const string LobbySceneName = "Lobby";
 
     private void Awake()
     {
@@ -23,29 +26,31 @@ public class SceneController : MonoBehaviour
 
     private void Start()
     {
-        LoadScene();
+        LoadSceneAdditively(LobbySceneName);
     }
 
-    // Método para iniciar o carregamento assíncrono da cena
-    public void LoadScene()
+    public async void LoadSceneAdditively(string sceneName, bool unloadLobby = false)
     {
-        // Inicia a rotina de carregamento assíncrono
-        StartCoroutine(LoadSceneAsync());
-    }
+        Debug.Log($"Loading Scene: {sceneName}");
 
-    // Método que realiza o carregamento assíncrono
-    private IEnumerator LoadSceneAsync()
-    {
-        // Cria uma operação de carregamento assíncrono
-        AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
-
-        // Enquanto a cena não estiver completamente carregada, continua esperando
-        while (!asyncLoad.isDone)
+        if (unloadLobby)
         {
-            yield return null;
+            ClearLobbyScene();
         }
 
-        // Torna a nova cena ativa
-        SceneManager.SetActiveScene(SceneManager.GetSceneByName(sceneName));
+        var newScene = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
+
+        // Aguarda o término do carregamento
+        while (!newScene.isDone)
+        {
+            await Task.Yield();
+        }
+
+        newScene.allowSceneActivation = true;
+    }    
+
+    public void ClearLobbyScene()
+    {
+        SceneManager.UnloadSceneAsync(LobbySceneName);
     }
 }

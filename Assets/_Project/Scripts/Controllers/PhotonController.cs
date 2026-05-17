@@ -1,10 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
 using System;
+using Debug_Log;
 using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine.Events;
+using MenuSystem.Pages;
 
 public class PhotonController : MonoBehaviourPunCallbacks
 {
@@ -13,13 +15,13 @@ public class PhotonController : MonoBehaviourPunCallbacks
     [Header("Setup")]
     //[SerializeField] string defaultRoomName = "Room";
     [Range(1, 15)]
-    //[SerializeField] int MaxPlayers = 15;
+    [SerializeField] int MaxPlayers = 15;
     //[SerializeField] GameObject _playerPrefab;
     //public string LastLoadedRoom { get; set; }
     //public string TargetRoomToLoad { get; private set; }
 
     private bool _isLoading;
-
+    
     public bool IsLoading
     {
         get => _isLoading;
@@ -28,21 +30,23 @@ public class PhotonController : MonoBehaviourPunCallbacks
             _isLoading = value;
             OnLoadingChangedEvent?.Invoke(_isLoading);
         }
-    }
-    [field: SerializeField] public bool IsConnected { get; private set; }
-    [field: SerializeField] public bool InLobby { get; private set; }
+    }    
+
+    [field: SerializeField] public bool IsConnected { get ; private set; }
+    [field: SerializeField] public bool InLobby { get; private set; }    
     //public GameObject localPlayer;
 
     //[Header("Testing")]
     //[SerializeField] bool spawnPlayerForTesting;
     //[SerializeField] Transform spawnPointForTesting;
 
-    //public static UnityEvent OnJoinedRoomEvent = new UnityEvent();
-    public static UnityEvent<bool> OnLoadingChangedEvent = new UnityEvent<bool>();
-
     
+    public static UnityEvent<bool> OnLoadingChangedEvent = new UnityEvent<bool>();
+    public static UnityEvent<int> OnConnectedChangedEvent = new UnityEvent<int>();
+    public static UnityEvent OnJoinedLobbyEvent = new UnityEvent();
+    public static UnityEvent OnJoinedRoomEvent = new UnityEvent();
 
-    //private string _nickName;
+    private DebugLog DebugLog;
 
     private void Awake()
     {
@@ -55,10 +59,10 @@ public class PhotonController : MonoBehaviourPunCallbacks
             Destroy(gameObject);
         }
 
+        DebugLog = DebugLog.instance;
+
         IsConnected = false;
         InLobby = false;
-        //LastLoadedRoom = null;
-        //TargetRoomToLoad = null;
     }
 
     private void Start()
@@ -90,45 +94,42 @@ public class PhotonController : MonoBehaviourPunCallbacks
     {
         //_nickName = $"nickNameTeste_{Guid.NewGuid().ToString()}";
 
-        Debug.Log($"Conectando no Photon como {_nickName}");
+        DebugLog.SetDebugLog($"Conectando no Photon Master");
 
         IsLoading = true;
 
         //ToggleMessageQueue(false);
 
-        //PhotonNetwork.AuthValues = new AuthenticationValues(_nickName);
-        //PhotonNetwork.AutomaticallySyncScene = false;
+        PhotonNetwork.AuthValues = new AuthenticationValues(_nickName);
+        PhotonNetwork.AutomaticallySyncScene = true;
         PhotonNetwork.NickName = _nickName;
 
         //PhotonNetwork.SendRate = 35;
         //PhotonNetwork.SerializationRate = 12;
 
+        PhotonNetwork.PhotonServerSettings.AppSettings.EnableLobbyStatistics = true;
+
         PhotonNetwork.ConnectUsingSettings();
     }
 
-    public void JoinRoom(string roomName)
+    public void JoinOrCreateRoom(string roomName)
     {
-        PhotonNetwork.JoinRoom(roomName);
+        DebugLog.SetDebugLog($"Criando e Entrando na Sala '{roomName}'");
+        
+        if (!PhotonNetwork.InLobby)
+        {
+            DebugLog.SetDebugLog($"Falha ao criar/entrar na sala '{roomName}', pois o usuário não está em um Looby");
+            return;
+        }
+
+        RoomOptions roomOptions = new RoomOptions();
+        roomOptions.IsOpen = true;
+        roomOptions.IsVisible = true;
+        roomOptions.MaxPlayers = (byte)MaxPlayers;
+        roomOptions.PublishUserId = true;
+
+        PhotonNetwork.JoinOrCreateRoom(roomName, roomOptions, TypedLobby.Default);
     }
-
-    //public void JoinOrCreateRoom(string roomName)
-    //{
-    //    Debug.Log($"Entrando na room ${roomName}");
-    //    if (!PhotonNetwork.InLobby)
-    //    {
-    //        Debug.LogWarning($"Falha ao entrar na room {roomName}, pois o usuário não está em um Looby");
-    //        return;
-    //    }
-
-    //    RoomOptions roomOptions = new RoomOptions();
-    //    roomOptions.IsOpen = true;
-    //    roomOptions.IsVisible = true;
-    //    roomOptions.MaxPlayers = (byte)MaxPlayers;
-    //    roomOptions.PublishUserId = true;
-
-    //    PhotonNetwork.JoinOrCreateRoom(roomName, roomOptions, TypedLobby.Default);
-    //    //PhotonNetwork.CreateRoom(roomName, roomOptions, TypedLobby.Default);
-    //}
 
     //public void SwitchToRegion(string targetRegion)
     //{
@@ -207,19 +208,20 @@ public class PhotonController : MonoBehaviourPunCallbacks
     #region Photon Chamadas
     public override void OnConnectedToMaster()
     {
-        Debug.Log("Você conectou ao Photon Master Server!");
+        DebugLog.SetDebugLog("Você conectou ao Photon Master Server!");
 
         IsConnected = true;
 
-        if (!PhotonNetwork.InLobby)
-        {
-            PhotonNetwork.JoinLobby();
-        }
+        PhotonNetwork.JoinLobby();
+
+        int countPlayers = PhotonNetwork.CountOfPlayers;
+
+        OnConnectedChangedEvent?.Invoke(countPlayers);
     }
 
     public override void OnDisconnected(DisconnectCause cause)
     {
-        Debug.Log("Você foi desconectado! Motivo: " + cause);
+        DebugLog.SetDebugLog("Você foi desconectado do Photon! Motivo: " + cause);
 
         //if(SceneController.Instance != null)
         //{
@@ -229,86 +231,99 @@ public class PhotonController : MonoBehaviourPunCallbacks
         IsConnected = false;
     }
 
-
     public override void OnJoinedLobby()
     {
-        Debug.Log("Você entrou no Photon Lobby!");
+        DebugLog.SetDebugLog("Você entrou no Photon Lobby!");
         InLobby = true;
+
+        OnJoinedLobbyEvent?.Invoke();        
     }
 
     public override void OnLeftLobby()
     {
-        Debug.Log("Você deixou o Lobby!");
+        DebugLog.SetDebugLog("Você deixou o Lobby!");
         InLobby = false;
     }
 
-    //public override void OnCreatedRoom()
-    //{
-    //    Debug.Log($"Você criou uma sala chamada {PhotonNetwork.CurrentRoom.Name}");
-    //}
+    public override void OnRoomListUpdate(List<RoomInfo> roomList)
+    {
+        LobbyController.instance.UpdateRoomList(roomList);
+    }
 
-    //public override void OnCreateRoomFailed(short returnCode, string message)
-    //{
-    //    Debug.LogWarning($"Houve um erro ao criar a sala, {message}");
-    //}
+    public override void OnCreatedRoom()
+    {
+        if (PhotonNetwork.IsMasterClient)
+        {
+            DebugLog.SetDebugLog("Você é o dono da sala");
+            LobbyController.instance.btnPlay.interactable = true;
+        }        
+    }
 
-    //public override void OnJoinedRoom()
-    //{
-    //    Debug.Log($"Você entrou em uma sala chamada {PhotonNetwork.CurrentRoom.Name}");
+    public override void OnCreateRoomFailed(short returnCode, string message)
+    {
+        DebugLog.SetDebugLog($"Houve um erro ao criar a sala, {message}");
+    }
 
-    //    IsLoading = false;
+    public override void OnJoinedRoom()
+    {
+        DebugLog.SetDebugLog($"Você entrou na sala chamada '{PhotonNetwork.CurrentRoom.Name}'");
 
-    //    LastLoadedRoom = PhotonNetwork.CurrentRoom.Name;
-    //    TargetRoomToLoad = null;
+        IsLoading = false;        
 
-    //    ToggleMessageQueue(false);
-
-    //    // load scene for new region
-    //    //SceneController.Instance.LoadTargetRegion();
-
-    //    OnJoinedRoomEvent?.Invoke();
-    //}
+        OnJoinedRoomEvent?.Invoke();
+    }
 
     public override void OnJoinRoomFailed(short returnCode, string message)
     {
-        Debug.LogWarning($"Houve um erro ao entrar na sala, {message}");
-
-        //if (String.IsNullOrEmpty(LastLoadedRoom))
-        //{
-        //    Debug.LogError("Nenhuma Room anterior para tentar se conectar");
-        //    return;
-        //}
-        //else
-        //{
-        //    // tries to connect to last room since target room failed
-        //    JoinOrCreateRoom(LastLoadedRoom);
-        //}
+        DebugLog.SetDebugLog($"Houve um erro ao entrar na sala, {message}");
     }
 
     public override void OnLeftRoom()
     {
-        Debug.Log($"Você saiu da sala");
+        DebugLog.SetDebugLog($"Você saiu da sala");
 
         IsLoading = true;
+
+        LobbyController.instance.btnPlay.interactable = false;
 
         // @TODO: destroy player obj for other if he was in a room already
         //DestroyPlayer();
     }
 
-    public override void OnPlayerEnteredRoom(Player newPlayer)
-    {
-        Debug.Log($"{newPlayer.UserId} entrou na sala");
-    }
+    //public override void OnPlayerEnteredRoom(Player newPlayer)
+    //{
+    //    Debug.Log($"{newPlayer.UserId} entrou na sala");
+    //}
 
-    public override void OnPlayerLeftRoom(Player otherPlayer)
-    {
-        Debug.Log($"{otherPlayer.UserId} saiu da sala");
-    }
+    //public override void OnPlayerLeftRoom(Player otherPlayer)
+    //{
+    //    Debug.Log($"{otherPlayer.UserId} saiu da sala");
+    //}
 
     public override void OnMasterClientSwitched(Player newMasterClient)
     {
-        Debug.Log($"Novo Master é {newMasterClient.UserId}");
+        DebugLog.SetDebugLog($"Novo Master é {newMasterClient.UserId}");
+
+        if (PhotonNetwork.IsMasterClient && PhotonNetwork.InLobby)
+        {
+            DebugLog.SetDebugLog("Você é o Dono da sala");
+            LobbyController.instance.btnPlay.interactable = true;
+        }
     }
+
+    public void LoadMaze()
+    {
+        if(PhotonNetwork.IsMasterClient)
+        {
+            //SceneController.instance.ClearLobbyScene();
+            PhotonNetwork.LoadLevel("MazeX_new");            
+            //SceneController.instance.LoadSceneAdditively("MazeX_new", true);
+        }
+    }
+
+    
+
+
     #endregion
 
     //#region Helpers

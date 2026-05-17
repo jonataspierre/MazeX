@@ -1,19 +1,23 @@
 using Photon.Pun;
+using MenuSystem;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 using Photon.Realtime;
+using MenuSystem.Pages;
+using Debug_Log;
+using Unity.VisualScripting;
 
 public class LobbyController : MonoBehaviourPunCallbacks
 {
-    //public static LobbyController instance;
+    public static LobbyController instance;
 
-    [Header("Pages")]
-    [SerializeField] GameObject pageTitle;
-    [SerializeField] GameObject pageLobby;
-    [SerializeField] GameObject pageRoom;
+    //[Header("Pages")]
+    //[SerializeField] GameObject pageTitle;
+    //[SerializeField] GameObject pageLobby;
+    //[SerializeField] GameObject pageRoom;
 
     [Space(10)]
     [Header("Title Setup")]
@@ -25,7 +29,7 @@ public class LobbyController : MonoBehaviourPunCallbacks
     [Header("Lobby Setup")]
     public TMP_InputField inputRoomName;
     public Button btnCreateRoom;
-    public TextMeshProUGUI playerNicknameText;
+    public TextMeshProUGUI playerNicknameText;    
 
     [Space(10)]
     [Header("Lobby RoomList")]
@@ -38,23 +42,48 @@ public class LobbyController : MonoBehaviourPunCallbacks
     [Space(10)]
     [Header("Room Setup")]
     public TextMeshProUGUI roomName;
+    public Button btnPlay;    
 
-    [SerializeField] int MaxPlayers = 15;
+    private DebugLog DebugLog;
+
+    public override void OnEnable()
+    {
+        if (instance == null) return;
+        
+        PhotonController.OnJoinedLobbyEvent.AddListener(JoinedLobby);
+        PhotonController.OnJoinedRoomEvent.AddListener(JoinedRoom);        
+    }
+
+    public override void OnDisable()
+    {
+        if (instance == null) return;
+        
+        PhotonController.OnJoinedLobbyEvent.RemoveListener(JoinedLobby);
+        PhotonController.OnJoinedRoomEvent.RemoveListener(JoinedRoom);        
+    }
 
     private void Awake()
     {
-        //if(instance == null)
-        //{
-        //    instance = this;
-        //}
-        //else
-        //{
-        //    Destroy(gameObject);
-        //}
-        //GetCurrentPlayers();
+        if (instance)
+        {
+            Destroy(gameObject);
+            return;            
+        }
+
+        instance = this;
+
+        DebugLog = DebugLog.instance;
+
+        PageController.instance.OpenPage("title");
+
+        if(PhotonNetwork.CountOfPlayers > 20)
+        {
+            btnConnect.interactable = false;
+            DebugLog.SetDebugLog("Servidor lotado, tente mais tarde");
+        }
     }    
 
-    #region Title
+    #region OnClicks
     public void OnClickConnect()
     {
         if (inputNickName.text.Length >= 1)
@@ -67,65 +96,45 @@ public class LobbyController : MonoBehaviourPunCallbacks
         }
     }
 
-    public override void OnConnectedToMaster()
-    {        
-        pageTitle.SetActive(false);
-        pageLobby.SetActive(true);
-    }
-    #endregion
-
-    #region Lobby
-    public override void OnJoinedLobby()
-    {
-        playerNicknameText.text = PhotonNetwork.LocalPlayer.NickName;
-    }
-
     public void OnClickCreateRoom()
     {
-        if(inputRoomName.text.Length >= 1)
+        if (!string.IsNullOrEmpty(inputRoomName.text))
         {
             string _roomName = inputRoomName.text;
 
-            Debug.Log($"Entrando na room ${_roomName}");
-            if (!PhotonNetwork.InLobby)
-            {
-                Debug.LogWarning($"Falha ao entrar na room {_roomName}, pois o usuário não está em um Looby");
-                return;
-            }
-
-            RoomOptions roomOptions = new RoomOptions();
-            //roomOptions.IsOpen = true;
-            //roomOptions.IsVisible = true;
-            roomOptions.MaxPlayers = (byte)MaxPlayers;
-            //roomOptions.PublishUserId = true;
-
-            PhotonNetwork.JoinOrCreateRoom(_roomName, roomOptions, TypedLobby.Default);
+            PhotonController.instance.JoinOrCreateRoom(_roomName);
         }
         else
         {
-            Debug.Log("Precisa ter mais de 3 caracteres");
+            DebugLog.SetDebugLog("Precisa de no mínimo 1 caractere");
         }
-    }
-
-    public override void OnCreatedRoom()
-    {
-        Debug.Log($"Criou a sala {PhotonNetwork.CurrentRoom.Name}");        
     }
     #endregion
 
-    #region List Rooms
-    public override void OnRoomListUpdate(List<RoomInfo> roomList)
+    #region On Events Call    
+    public void JoinedLobby()
     {
-        //if (Time.time >= nextUpdateTime)
-        //{
-        //    UpdateRoomList(roomList);
-        //    nextUpdateTime = Time.time + timeBetweenUpdates;
-        //}
+        playerNicknameText.text = PhotonNetwork.LocalPlayer.NickName;
 
-        //DestroyRoomItem();
+        instance.btnPlay.interactable = false;        
 
-        UpdateRoomList(roomList);
+        PageController.instance.OpenPage("lobby");        
     }
+
+    public void JoinedRoom()
+    {
+        PageController.instance.OpenPage("room");
+        roomName.text = PhotonNetwork.CurrentRoom.Name;
+        DestroyRoomItem();
+        roomItemsList.Clear();
+    }    
+    #endregion
+
+    #region List Rooms
+    //public override void OnRoomListUpdate(List<RoomInfo> roomList)
+    //{
+    //    UpdateRoomList(roomList);
+    //}
 
     public void DestroyRoomItem()
     {
@@ -138,7 +147,7 @@ public class LobbyController : MonoBehaviourPunCallbacks
         }        
     }
 
-    void UpdateRoomList(List<RoomInfo> roomList)
+    public void UpdateRoomList(List<RoomInfo> roomList)
     {
         int countRooms = PhotonNetwork.CountOfRooms;
         
@@ -186,20 +195,20 @@ public class LobbyController : MonoBehaviourPunCallbacks
         LeaveRoom();
     }
 
-    public override void OnJoinedRoom()
+    public void OnClickPlay()
     {
-        Debug.Log($"Você entrou em uma sala chamada {PhotonNetwork.CurrentRoom.Name}");
-        pageLobby.SetActive(false);
-        pageRoom.SetActive(true);
-        roomName.text = "Sala\n" + PhotonNetwork.CurrentRoom.Name;
-        DestroyRoomItem();
-        roomItemsList.Clear();
+        btnPlay.interactable = false;
+        if (PhotonNetwork.IsMasterClient)
+        {
+            PhotonNetwork.LoadLevel("MazeX");
+        }
     }
 
+    
+
     public override void OnLeftRoom()
-    {        
-        pageRoom.SetActive(false);
-        pageLobby.SetActive(true);
+    {
+        PageController.instance.OpenPage("lobby");
         DestroyRoomItem();
     }
 }

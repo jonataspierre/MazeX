@@ -1,0 +1,24 @@
+﻿<Solution>
+  <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="PhotonRealtime.csproj" />
+  <Project Path="PhotonUnityNetworking.Editor.csproj" />
+  <Project Path="PhotonUnityNetworking.csproj" />
+  <Project Path="fps.Game.csproj" />
+  <Project Path="PhotonUnityNetworking.Demos.csproj" />
+  <Project Path="fps.UI.csproj" />
+  <Project Path="fps.Gameplay.csproj" />
+  <Project Path="Unity.FPS.Tutorials.csproj" />
+  <Project Path="PhotonUnityNetworking.Utilities.csproj" />
+  <Project Path="fps.AI.csproj" />
+  <Project Path="ParrelSync.csproj" />
+  <Project Path="fps.Editor.csproj" />
+  <Project Path="PunDemos.DemoHubEditor.csproj" />
+  <Project Path="PunDemos.DemoSlotcarEditor.csproj" />
+  <Project Path="PhotonChat.csproj" />
+  <Project Path="Unity.Microgame.Tutorials.csproj" />
+  <Project Path="NavMeshComponentsEditor.csproj" />
+  <Project Path="PhotonUnityNetworking.Utilities.PhotonPlayer.Editor.csproj" />
+  <Project Path="NavMeshComponents.csproj" />
+  <Project Path="PhotonUnityNetworking.Utilities.Culling.Editor.csproj" />
+  <Project Path="Assembly-CSharp-Editor.csproj" />
+</Solution>
