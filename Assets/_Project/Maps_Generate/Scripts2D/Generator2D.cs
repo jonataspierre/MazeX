@@ -270,7 +270,7 @@ public class Generator2D : MonoBehaviourPun
             indexPlayerSpawnRoom = UnityEngine.Random.Range(0, rooms.Count);
         }
 
-        Vector3 pos = new Vector3(rooms[indexPlayerSpawnRoom].bounds.x + 1, 1.5f, rooms[indexPlayerSpawnRoom].bounds.y + 1);
+        Vector3 pos = new Vector3(rooms[indexPlayerSpawnRoom].bounds.x + 1, 1.5f, rooms[indexPlayerSpawnRoom].bounds.y + 10);
 
         OnRoomCreate?.Invoke(pos);
 
