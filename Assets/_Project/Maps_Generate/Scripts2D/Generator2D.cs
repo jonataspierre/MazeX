@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Random = System.Random;
@@ -7,7 +7,7 @@ using Photon.Pun;
 using UnityEngine.Events;
 
 
-public class Generator2D : MonoBehaviourPun
+public class Generator2D : MonoBehaviourPunCallbacks
 {
     enum CellType {
         None,
@@ -41,6 +41,12 @@ public class Generator2D : MonoBehaviourPun
     [SerializeField] int roomCount;
     [SerializeField] bool fixedRoomCount;
     [SerializeField] Vector2Int randomRoomCount;
+    [SerializeField] int maxPlacementRetries = 10;
+
+    [Space(10)]
+    [Header("Seed Setup")]
+    [SerializeField] bool useRandomSeed = true;
+    [SerializeField] int seed = 0;
 
     [Space(10)]
     [SerializeField]
@@ -83,6 +89,7 @@ public class Generator2D : MonoBehaviourPun
     [Header("Player Setup")]
     [SerializeField] GameObject playerPrefab;
     public int indexPlayerSpawnRoom;
+    public Vector3 lastSpawnPosition;
 
     bool canSpawnerPlayer = false;
 
@@ -90,55 +97,86 @@ public class Generator2D : MonoBehaviourPun
 
     void Start()
     {
-        if (PhotonNetwork.IsMasterClient)
+        lastSpawnPosition = Vector3.zero;
+        Debug.Log($"[Generator2D] Start. IsMaster: {PhotonNetwork.IsMasterClient}, InRoom: {PhotonNetwork.InRoom}");
+        
+        if (PhotonNetwork.IsConnected && PhotonNetwork.InRoom)
         {
-            if (!fixedSize)
+            if (PhotonNetwork.IsMasterClient)
             {
-                SetSize();
-            }
+                Debug.Log("[Generator2D] Master Client setting up map...");
+                if (!fixedSize) SetSize();
+                if (!fixedRoomCount) SetRoomCount();
+                
+                if (useRandomSeed) seed = UnityEngine.Random.Range(0, int.MaxValue);
 
-            if (!fixedRoomCount)
+                Debug.Log($"[Generator2D] Seed: {seed}, Size: {size}, Rooms: {roomCount}");
+
+                ExitGames.Client.Photon.Hashtable props = new ExitGames.Client.Photon.Hashtable
+                {
+                    { "MapSeed", seed },
+                    { "MapWidth", size.x },
+                    { "MapHeight", size.y },
+                    { "RoomCount", roomCount }
+                };
+                PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+                
+                // Master gera o mapa e DEPOIS spawna
+                GenerateMap();
+                StartCoroutine(DelayedSpawn());
+            }
+            else
             {
-                SetRoomCount();
+                Debug.Log("[Generator2D] Client waiting for properties...");
+                ReadPropertiesAndGenerate();
             }
-
-            Generate();
-
-            canSpawnerPlayer = true;
         }
+        else
+        {
+            Debug.Log("[Generator2D] Offline mode generation.");
+            GenerateMap();
+            StartCoroutine(DelayedSpawn());
+        }
+    }
 
-        if(canSpawnerPlayer)
-            SetSpawnPlayer();
+    IEnumerator DelayedSpawn()
+    {
+        // Espera um frame para garantir que toda a geometria foi instanciada e colisores estão ativos
+        yield return new WaitForEndOfFrame();
+        SetSpawnPlayer();
+    }
 
-        //if (!fixedSize)
-        //{
-        //    SetSize();
-        //}
+    public override void OnRoomPropertiesUpdate(ExitGames.Client.Photon.Hashtable propertiesThatChanged)
+    {
+        Debug.Log("[Generator2D] Room properties updated.");
+        if (!PhotonNetwork.IsMasterClient && propertiesThatChanged.ContainsKey("MapSeed"))
+        {
+            ReadPropertiesAndGenerate();
+        }
+    }
 
-        //if (!fixedRoomCount)
-        //{
-        //    SetRoomCount();
-        //}
-
-        //Generate();
+    void ReadPropertiesAndGenerate()
+    {
+        if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue("MapSeed", out object s))
+        {
+            seed = (int)s;
+            size.x = (int)PhotonNetwork.CurrentRoom.CustomProperties["MapWidth"];
+            size.y = (int)PhotonNetwork.CurrentRoom.CustomProperties["MapHeight"];
+            roomCount = (int)PhotonNetwork.CurrentRoom.CustomProperties["RoomCount"];
+            
+            Debug.Log($"[Generator2D] Received Seed: {seed}. Generating...");
+            useRandomSeed = false;
+            GenerateMap();
+            StartCoroutine(DelayedSpawn());
+        }
     }
 
     [ContextMenu("Generate Map")]
     public void GenerateMap()
     {
         ResetMap();
-
-        if (!fixedSize)
-        {
-            SetSize();
-        }
-
-        if (!fixedRoomCount)
-        {
-            SetRoomCount();
-        }
-
         Generate();
+        canSpawnerPlayer = true;
     }
 
     void ResetMap()
@@ -191,68 +229,104 @@ public class Generator2D : MonoBehaviourPun
     }
 
     void Generate() {
-        random = new Random(0);
+        if (useRandomSeed) {
+            seed = UnityEngine.Random.Range(0, int.MaxValue);
+        }
+        random = new Random(seed);
         grid = new Grid2D<CellType>(size, Vector2Int.zero);
         rooms = new List<Room>();
-        //roomsObj = new List<GameObject>();
 
         PlaceRooms();
         Triangulate();
         CreateHallways();
         PathfindHallways();
-        AddWallsAndCeilings();
-
         
+        // Ensure every walkable tile has a floor object
+        GenerateFloor();
+        
+        AddWallsAndCeilings();
+    }
+
+    void GenerateFloor()
+    {
+        for (int x = 0; x < size.x; x++)
+        {
+            for (int y = 0; y < size.y; y++)
+            {
+                if (grid[x, y] == CellType.Room)
+                {
+                    PlaceFloorTile(new Vector2Int(x, y), redMaterial);
+                }
+                else if (grid[x, y] == CellType.Hallway)
+                {
+                    PlaceFloorTile(new Vector2Int(x, y), blueMaterial);
+                }
+            }
+        }
+    }
+
+    void PlaceFloorTile(Vector2Int location, Material material)
+    {
+        GameObject go = Instantiate(cubePrefab, new Vector3(location.x, 0, location.y), Quaternion.identity);
+        go.transform.SetParent(floorContainerParent.transform, false);
+        go.transform.localScale = Vector3.one; 
+        go.GetComponent<MeshRenderer>().material = material;
+        
+        // Ensure floor has a collider
+        if (go.GetComponent<BoxCollider>() == null)
+        {
+            go.AddComponent<BoxCollider>();
+        }
+        
+        go.name = $"Floor_{location.x}_{location.y}";
     }
 
     void PlaceRooms()
     {
         for (int i = 0; i < roomCount; i++) {
-            Vector2Int location = new Vector2Int(
-                random.Next(0, size.x),
-                random.Next(0, size.y)
-            );
+            bool placed = false;
+            for (int retry = 0; retry < maxPlacementRetries; retry++) {
+                Vector2Int roomSize = new Vector2Int(
+                    random.Next(3, roomMaxSize.x + 1), // Min size 3 to ensure internal space
+                    random.Next(3, roomMaxSize.y + 1)
+                );
 
-            Vector2Int roomSize = new Vector2Int(
-                random.Next(1, roomMaxSize.x + 1),
-                random.Next(1, roomMaxSize.y + 1)
-            );
+                Vector2Int location = new Vector2Int(
+                    random.Next(1, size.x - roomSize.x - 1), // Buffer for walls
+                    random.Next(1, size.y - roomSize.y - 1)
+                );
 
-            bool add = true;
-            Room newRoom = new Room(location, roomSize);
-            Room buffer = new Room(location + new Vector2Int(-1, -1), roomSize + new Vector2Int(2, 2));
+                bool add = true;
+                Room newRoom = new Room(location, roomSize);
+                Room buffer = new Room(location + new Vector2Int(-1, -1), roomSize + new Vector2Int(2, 2));
 
-            foreach (var room in rooms) {
-                if (Room.Intersect(room, buffer)) {
-                    add = false;
-                    break;
+                foreach (var room in rooms) {
+                    if (Room.Intersect(room, buffer)) {
+                        add = false;
+                        break;
+                    }
                 }
-            }
 
-            if (newRoom.bounds.xMin < 0 || newRoom.bounds.xMax >= size.x
-                || newRoom.bounds.yMin < 0 || newRoom.bounds.yMax >= size.y) {
-                add = false;
-            }
-
-            if (add) {
-                rooms.Add(newRoom);
-                PlaceRoom(newRoom.bounds.position, newRoom.bounds.size);
-
-                foreach (var pos in newRoom.bounds.allPositionsWithin) {
-                    grid[pos] = CellType.Room;
+                if (add) {
+                    rooms.Add(newRoom);
+                    foreach (var pos in newRoom.bounds.allPositionsWithin) {
+                        grid[pos] = CellType.Room;
+                    }
+                    placed = true;
+                    break;
                 }
             }
         }
 
         SetExitPosition();
-        //SetSpawnPlayer();
     }
 
     void SetExitPosition()
     {
-        indexExitRoom = UnityEngine.Random.Range(0, rooms.Count);
+        // Voltar para a lógica original que o usuário confirmou que funciona
+        indexExitRoom = random.Next(0, rooms.Count);
 
-        GameObject go = PhotonNetwork.Instantiate(exitPrefab.name, new Vector3(rooms[indexExitRoom].bounds.x, 1, rooms[indexExitRoom].bounds.y), Quaternion.identity);
+        GameObject go = Instantiate(exitPrefab, new Vector3(rooms[indexExitRoom].bounds.x, 1, rooms[indexExitRoom].bounds.y), Quaternion.identity);
         go.transform.SetParent(triggersContainerParent.transform, false);        
         go.GetComponent<Transform>().localScale = new Vector3(0.5f, 0.5f, 0.5f);
         go.GetComponent<MeshRenderer>().material = greenMaterial;
@@ -261,28 +335,28 @@ public class Generator2D : MonoBehaviourPun
 
     void SetSpawnPlayer()
     {
-        //if(roomCount == 0) roomCount = 2;
-        
-        indexPlayerSpawnRoom = UnityEngine.Random.Range(0, rooms.Count);
-
-        while(indexPlayerSpawnRoom == indexExitRoom)
-        {
-            indexPlayerSpawnRoom = UnityEngine.Random.Range(0, rooms.Count);
+        // Use the global 'random' instance to keep it synchronized and deterministic with the seed
+        // We pick a room index that isn't the exit
+        int roomIdx = random.Next(0, rooms.Count);
+        int attempts = 0;
+        while (roomIdx == indexExitRoom && attempts < 10 && rooms.Count > 1) {
+            roomIdx = random.Next(0, rooms.Count);
+            attempts++;
         }
+        
+        indexPlayerSpawnRoom = roomIdx;
+        Room targetRoom = rooms[indexPlayerSpawnRoom];
 
-        Vector3 pos = new Vector3(rooms[indexPlayerSpawnRoom].bounds.x + 1, 5f, rooms[indexPlayerSpawnRoom].bounds.y + 1);
+        // Calculate the center of the room
+        float centerX = targetRoom.bounds.x + (targetRoom.bounds.size.x / 2f);
+        float centerZ = targetRoom.bounds.y + (targetRoom.bounds.size.y / 2f);
 
-        OnRoomCreate?.Invoke(pos);
+        // Position slightly above the floor (floor is at Y=0)
+        Vector3 spawnPos = new Vector3(centerX, 1.2f, centerZ);
+        lastSpawnPosition = spawnPos;
 
-        //GameObject player = Instantiate(playerPrefab, new Vector3(rooms[indexPlayerSpawnRoom].bounds.x + 1, 1.05f, rooms[indexPlayerSpawnRoom].bounds.y + 1), Quaternion.identity);
-        //player.transform.SetParent(playersContainerParent.transform, false);
-        //player.GetComponent<Transform>().localScale = new Vector3(0.25f, 0.25f, 0.25f);        
-        //player.name = "Player";
-
-        //GameObject localPlayer = PhotonNetwork.Instantiate("PlayerManager", new Vector3(rooms[indexPlayerSpawnRoom].bounds.x + 1, 1.05f, rooms[indexPlayerSpawnRoom].bounds.y + 1), Quaternion.identity, 0);
-        //localPlayer.name = "Manager_" + PhotonNetwork.LocalPlayer.NickName;
-
-        //player.GetComponent<MeshRenderer>().material = greenMaterial;
+        Debug.Log($"[Generator2D] Player Spawn: Room {indexPlayerSpawnRoom} at {spawnPos}. Seed: {seed}");
+        OnRoomCreate?.Invoke(spawnPos);
     }
 
     void Triangulate() {
@@ -352,18 +426,6 @@ public class Generator2D : MonoBehaviourPun
                     if (grid[current] == CellType.None) {
                         grid[current] = CellType.Hallway;
                     }
-
-                    if (i > 0) {
-                        var prev = path[i - 1];
-
-                        var delta = current - prev;
-                    }
-                }
-
-                foreach (var pos in path) {
-                    if (grid[pos] == CellType.Hallway) {
-                        PlaceHallway(pos);
-                    }
                 }
             }
         }
@@ -371,84 +433,89 @@ public class Generator2D : MonoBehaviourPun
 
     void PlaceCube(Vector2Int location, Vector2Int size, Material material, bool isRoom = false)
     {
-        GameObject go = PhotonNetwork.Instantiate(cubePrefab.name, new Vector3(location.x, 0, location.y), Quaternion.identity);
-        go.transform.SetParent(floorContainerParent.transform, false);
-        go.GetComponent<Transform>().localScale = new Vector3(size.x, 1, size.y);
-        go.GetComponent<MeshRenderer>().material = material;        
+        // This method is now legacy as we use PlaceFloorTile for tile-by-tile generation
+        // But we'll keep it for compatibility if needed elsewhere, updated to tile logic
+        for(int x = 0; x < size.x; x++) {
+            for(int y = 0; y < size.y; y++) {
+                PlaceFloorTile(new Vector2Int(location.x + x, location.y + y), material);
+            }
+        }
     }
 
     void PlaceRoom(Vector2Int location, Vector2Int size)
     {
-        PlaceCube(location, size, redMaterial, true);        
+        // Legacy call
     }
 
     void PlaceHallway(Vector2Int location)
     {
-        PlaceCube(location, new Vector2Int(1, 1), blueMaterial);
+        // Legacy call
     }
 
     #region Paredes e Teto
     void AddWallsAndCeilings()
     {
-        // Marcar as células onde as paredes devem ser colocadas
+        // First pass: Clear any accidental wall markings to start clean
+        for (int x = 0; x < size.x; x++) {
+            for (int y = 0; y < size.y; y++) {
+                if (grid[x, y] == CellType.Wall) grid[x, y] = CellType.None;
+            }
+        }
+
+        // Second pass: Identify all tiles adjacent to walkable areas (Rooms/Hallways)
         for (int x = 0; x < size.x; x++)
         {
             for (int y = 0; y < size.y; y++)
             {
-                // Verificar se a célula está em uma das bordas do mapa
-                bool onBorder = x == 0 || x == size.x - 1 || y == 0 || y == size.y - 1;
-
-                // Marcar as células ao redor das salas ou corredores
                 if (grid[x, y] == CellType.Room || grid[x, y] == CellType.Hallway)
                 {
+                    // Check all 8 directions around the walkable tile
                     for (int dx = -1; dx <= 1; dx++)
                     {
                         for (int dy = -1; dy <= 1; dy++)
                         {
+                            if (dx == 0 && dy == 0) continue;
+
                             int nx = x + dx;
                             int ny = y + dy;
 
-                            // Verificar se a célula está dentro dos limites do mapa e se é uma célula vazia
-                            if (nx >= 0 && nx < size.x && ny >= 0 && ny < size.y && grid[nx, ny] == CellType.None)
+                            // If adjacent tile is outside or empty, it must be a wall
+                            if (nx < 0 || nx >= size.x || ny < 0 || ny >= size.y) continue;
+                            
+                            if (grid[nx, ny] == CellType.None)
                             {
-                                // Marcar a célula adjacente como uma parede
                                 grid[nx, ny] = CellType.Wall;
                             }
                         }
                     }
                 }
-
-                // Se a célula estiver na borda do mapa, marcá-la como uma parede
-                if (onBorder)
-                {
-                    grid[x, y] = CellType.Wall;
-                }
             }
         }
 
-        if (hasCeiling)
-        {
-            // Instanciar o teto como um painel que cobre toda a área do mapa
-            GameObject ceilingObject = PhotonNetwork.Instantiate(ceilingPrefab.name, new Vector3(0f, 2f, 0f), Quaternion.identity);
-            ceilingObject.transform.localScale = new Vector3(size.x, 0.1f, size.y);
-            ceilingObject.transform.SetParent(ceilingContainerParent.transform, false);
-            // Adicionar um componente de colisão ao teto
-            ceilingObject.AddComponent<BoxCollider>();
-        }
-
-        // Instanciar as paredes
+        // Third pass: Create wall objects
         for (int x = 0; x < size.x; x++)
         {
             for (int y = 0; y < size.y; y++)
             {
                 if (grid[x, y] == CellType.Wall)
                 {
-                    // Instanciar a parede sobre a célula
-                    GameObject wallObject = PhotonNetwork.Instantiate(wallPrefab.name, new Vector3(x, 1f, y), Quaternion.identity);
+                    GameObject wallObject = Instantiate(wallPrefab, new Vector3(x, 1f, y), Quaternion.identity);
                     wallObject.transform.SetParent(wallContainerParent.transform, false);
-                    // Adicionar um componente de colisão à parede
-                    //wallObject.AddComponent<BoxCollider>();
+                    wallObject.name = $"Wall_{x}_{y}";
                 }
+            }
+        }
+
+        if (hasCeiling)
+        {
+            // Ceiling now covers the entire bounding box of the grid for complete closure
+            Vector3 ceilingPos = new Vector3((size.x - 1) / 2f, 2f, (size.y - 1) / 2f);
+            GameObject ceilingObject = Instantiate(ceilingPrefab, ceilingPos, Quaternion.identity);
+            ceilingObject.transform.localScale = new Vector3(size.x, 0.1f, size.y);
+            ceilingObject.transform.SetParent(ceilingContainerParent.transform, false);
+            if (ceilingObject.GetComponent<BoxCollider>() == null)
+            {
+                ceilingObject.AddComponent<BoxCollider>();
             }
         }
     }

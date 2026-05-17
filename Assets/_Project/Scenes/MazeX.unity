@@ -183,10 +183,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   size: {x: 30, y: 35}
   fixedSize: 0
-  randomSize: {x: 30, y: 35}
+  randomSize: {x: 100, y: 100}
   roomCount: 100
   fixedRoomCount: 0
   randomRoomCount: {x: 100, y: 110}
+  maxPlacementRetries: 10
+  useRandomSeed: 1
+  seed: 0
   roomMaxSize: {x: 6, y: 6}
   cubePrefab: {fileID: 7415050535990569633, guid: 0845b845785260b41b421d28b957d58a,
     type: 3}
