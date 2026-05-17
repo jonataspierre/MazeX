@@ -18,6 +18,7 @@
   <Project Path="Unity.Microgame.Tutorials.csproj" />
   <Project Path="NavMeshComponentsEditor.csproj" />
   <Project Path="PhotonUnityNetworking.Utilities.PhotonPlayer.Editor.csproj" />
+  <Project Path="Bezi.Editor.csproj" />
   <Project Path="NavMeshComponents.csproj" />
   <Project Path="PhotonUnityNetworking.Utilities.Culling.Editor.csproj" />
   <Project Path="Assembly-CSharp-Editor.csproj" />
