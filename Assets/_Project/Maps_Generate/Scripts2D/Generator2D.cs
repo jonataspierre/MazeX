@@ -105,8 +105,32 @@ public class Generator2D : MonoBehaviourPunCallbacks
             if (PhotonNetwork.IsMasterClient)
             {
                 Debug.Log("[Generator2D] Master Client setting up map...");
+                // Check for UI-driven properties
+                if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("FixedSize"))
+                    fixedSize = (bool)PhotonNetwork.CurrentRoom.CustomProperties["FixedSize"];
+                if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("FixedRoomCount"))
+                    fixedRoomCount = (bool)PhotonNetwork.CurrentRoom.CustomProperties["FixedRoomCount"];
+
                 if (!fixedSize) SetSize();
+                else {
+                    if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("MapWidth"))
+                        size.x = (int)PhotonNetwork.CurrentRoom.CustomProperties["MapWidth"];
+                    if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("MapHeight"))
+                        size.y = (int)PhotonNetwork.CurrentRoom.CustomProperties["MapHeight"];
+                }
+
                 if (!fixedRoomCount) SetRoomCount();
+                else {
+                    if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("RoomCount"))
+                        roomCount = (int)PhotonNetwork.CurrentRoom.CustomProperties["RoomCount"];
+                }
+
+                if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("MaxRoomW"))
+                    roomMaxSize.x = (int)PhotonNetwork.CurrentRoom.CustomProperties["MaxRoomW"];
+                if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("MaxRoomH"))
+                    roomMaxSize.y = (int)PhotonNetwork.CurrentRoom.CustomProperties["MaxRoomH"];
+                if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("HasCeiling"))
+                    hasCeiling = (bool)PhotonNetwork.CurrentRoom.CustomProperties["HasCeiling"];
                 
                 if (useRandomSeed) seed = UnityEngine.Random.Range(0, int.MaxValue);
 
@@ -117,7 +141,10 @@ public class Generator2D : MonoBehaviourPunCallbacks
                     { "MapSeed", seed },
                     { "MapWidth", size.x },
                     { "MapHeight", size.y },
-                    { "RoomCount", roomCount }
+                    { "RoomCount", roomCount },
+                    { "MaxRoomW", roomMaxSize.x },
+                    { "MaxRoomH", roomMaxSize.y },
+                    { "HasCeiling", hasCeiling }
                 };
                 PhotonNetwork.CurrentRoom.SetCustomProperties(props);
                 
@@ -163,6 +190,9 @@ public class Generator2D : MonoBehaviourPunCallbacks
             size.x = (int)PhotonNetwork.CurrentRoom.CustomProperties["MapWidth"];
             size.y = (int)PhotonNetwork.CurrentRoom.CustomProperties["MapHeight"];
             roomCount = (int)PhotonNetwork.CurrentRoom.CustomProperties["RoomCount"];
+            roomMaxSize.x = (int)PhotonNetwork.CurrentRoom.CustomProperties["MaxRoomW"];
+            roomMaxSize.y = (int)PhotonNetwork.CurrentRoom.CustomProperties["MaxRoomH"];
+            hasCeiling = (bool)PhotonNetwork.CurrentRoom.CustomProperties["HasCeiling"];
             
             Debug.Log($"[Generator2D] Received Seed: {seed}. Generating...");
             useRandomSeed = false;

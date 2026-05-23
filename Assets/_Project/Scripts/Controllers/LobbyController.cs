@@ -42,7 +42,18 @@ public class LobbyController : MonoBehaviourPunCallbacks
     [Space(10)]
     [Header("Room Setup")]
     public TextMeshProUGUI roomName;
-    public Button btnPlay;    
+    public Button btnPlay;
+    
+    [Header("Map Settings UI")]
+    public GameObject settingsPanel;
+    public TMP_InputField inputWidth;
+    public TMP_InputField inputHeight;
+    public Toggle toggleRandomSize;
+    public TMP_InputField inputRoomCount;
+    public Toggle toggleRandomRoomCount;
+    public TMP_InputField inputRoomMaxW;
+    public TMP_InputField inputRoomMaxH;
+    public Toggle toggleHasCeiling;
 
     private DebugLog DebugLog;
 
@@ -106,7 +117,7 @@ public class LobbyController : MonoBehaviourPunCallbacks
         }
         else
         {
-            DebugLog.SetDebugLog("Precisa de no mínimo 1 caractere");
+            DebugLog.SetDebugLog("Precisa de no mï¿½nimo 1 caractere");
         }
     }
     #endregion
@@ -127,6 +138,12 @@ public class LobbyController : MonoBehaviourPunCallbacks
         roomName.text = PhotonNetwork.CurrentRoom.Name;
         DestroyRoomItem();
         roomItemsList.Clear();
+
+        // Only show settings panel for Master Client
+        if (settingsPanel != null)
+        {
+            settingsPanel.SetActive(PhotonNetwork.IsMasterClient);
+        }
     }    
     #endregion
 
@@ -191,7 +208,7 @@ public class LobbyController : MonoBehaviourPunCallbacks
 
     public void OnClickLeaveRoom()
     {
-        Debug.Log($"Você saiu da sala chamada {PhotonNetwork.CurrentRoom.Name}");
+        Debug.Log($"Vocï¿½ saiu da sala chamada {PhotonNetwork.CurrentRoom.Name}");
         LeaveRoom();
     }
 
@@ -200,7 +217,32 @@ public class LobbyController : MonoBehaviourPunCallbacks
         btnPlay.interactable = false;
         if (PhotonNetwork.IsMasterClient)
         {
+            // Capture UI settings and save to room properties
+            ExitGames.Client.Photon.Hashtable props = new ExitGames.Client.Photon.Hashtable();
+            
+            if (int.TryParse(inputWidth.text, out int w)) props.Add("MapWidth", w);
+            if (int.TryParse(inputHeight.text, out int h)) props.Add("MapHeight", h);
+            props.Add("FixedSize", !toggleRandomSize.isOn);
+            
+            if (int.TryParse(inputRoomCount.text, out int rc)) props.Add("RoomCount", rc);
+            props.Add("FixedRoomCount", !toggleRandomRoomCount.isOn);
+            
+            if (int.TryParse(inputRoomMaxW.text, out int mw)) props.Add("MaxRoomW", mw);
+            if (int.TryParse(inputRoomMaxH.text, out int mh)) props.Add("MaxRoomH", mh);
+            
+            props.Add("HasCeiling", toggleHasCeiling.isOn);
+
+            PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+            
             PhotonNetwork.LoadLevel("MazeX");
+        }
+    }
+
+    public void UpdateMapSettings(ExitGames.Client.Photon.Hashtable settings)
+    {
+        if (PhotonNetwork.IsMasterClient)
+        {
+            PhotonNetwork.CurrentRoom.SetCustomProperties(settings);
         }
     }
 
